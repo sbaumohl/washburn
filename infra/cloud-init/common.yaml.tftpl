@@ -1,0 +1,69 @@
+#cloud-config
+# Rendered once per VM by OpenTofu (templatefile). Variables: role, hostname,
+# tailscale_auth_key. Plain shell $VAR and $(...) are fine. A literal dollar
+# brace or percent brace in the script must be escaped by doubling the first
+# character, so it is not read as a template directive.
+#
+# The bootstrap script runs with `set -euo pipefail`. Ordering matters:
+# sshd is disabled only AFTER `tailscale up` has succeeded, so a failed
+# join leaves sshd running and the VM reachable from the Vultr console.
+write_files:
+  - path: /usr/local/sbin/washburn-bootstrap.sh
+    permissions: '0700'
+    owner: root:root
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      export DEBIAN_FRONTEND=noninteractive
+
+      hostnamectl set-hostname ${hostname}
+
+      CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
+      ARCH="$(dpkg --print-architecture)"
+
+      apt-get update
+      apt-get install -y ca-certificates curl
+
+      # Docker: official apt repository.
+      install -m 0755 -d /etc/apt/keyrings
+      curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+      chmod a+r /etc/apt/keyrings/docker.asc
+      printf 'deb [arch=%s signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu %s stable\n' \
+        "$ARCH" "$CODENAME" > /etc/apt/sources.list.d/docker.list
+
+      # Tailscale: official apt repository (pkgs.tailscale.com).
+      curl -fsSL "https://pkgs.tailscale.com/stable/ubuntu/$CODENAME.noarmor.gpg" \
+        -o /usr/share/keyrings/tailscale-archive-keyring.gpg
+      curl -fsSL "https://pkgs.tailscale.com/stable/ubuntu/$CODENAME.tailscale-keyring.list" \
+        -o /etc/apt/sources.list.d/tailscale.list
+
+      apt-get update
+      apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin tailscale rsync zstd borgbackup
+      systemctl enable --now docker
+
+      # Tailscale join. This is the only secret in user-data (see infra/README.md).
+      systemctl enable --now tailscaled
+      tailscale up --authkey=${tailscale_auth_key} --hostname=${hostname} --ssh \
+        --advertise-tags=tag:washburn,tag:washburn-${role}
+
+      install -d -m 0750 /opt/washburn /etc/washburn
+      printf '%s\n' '${role}' > /etc/washburn/role
+      chmod 0644 /etc/washburn/role
+      %{~ if role == "data" }
+      # Postgres data lives on the instance NVMe. 999 is the postgres user in the official image.
+      install -d -m 0750 /opt/washburn/pgdata
+      chown 999:999 /opt/washburn/pgdata
+      sysctl -w vm.swappiness=10
+      printf 'vm.swappiness=10\n' > /etc/sysctl.d/99-washburn.conf
+      %{~ endif }
+
+      # Password auth off everywhere, even though sshd is about to be disabled.
+      printf 'PasswordAuthentication no\nKbdInteractiveAuthentication no\nPermitRootLogin no\n' > /etc/ssh/sshd_config.d/99-washburn.conf
+
+      # Tailscale SSH replaces OpenSSH on every role. Ubuntu 24.04 uses
+      # ssh.service with ssh.socket, so both are stopped, disabled and masked.
+      systemctl disable --now ssh.service ssh.socket
+      systemctl mask ssh.service ssh.socket
+
+runcmd:
+  - [/usr/local/sbin/washburn-bootstrap.sh]

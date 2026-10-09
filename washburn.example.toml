@@ -1,0 +1,140 @@
+# Washburn: the single configuration file.
+#
+# Copy to washburn.toml (gitignored) and fill in. Every other config artifact
+# (OpenTofu tfvars, per-VM .env files, Caddyfile hosts, borg settings) is
+# rendered FROM this file by `scripts/render-config.py`. Never edit the
+# rendered files by hand; never commit washburn.toml.
+
+# ---------------------------------------------------------------- model APIs
+# These two tables are passed through verbatim to the crawler's `Services`
+# struct, so the field names must stay exactly as they are.
+[typesafe]
+api_key = "REPLACE"
+model = "jev-latest"
+base_url = "https://api.typesafe.ai/v1"
+
+[openrouter]
+api_key = "REPLACE"
+# A strong model whose provider supports JSON-schema structured outputs.
+model = "provider/strong-review-model"
+base_url = "https://openrouter.ai/api/v1"
+
+# ---------------------------------------------------------------- domain
+[domain]
+# Apex domain you already own. DNS is managed by you, not by OpenTofu.
+root = "example.com"
+# Public read-only site (reports + statistics).
+public_host = "example.com"
+# Admin dashboard. Served ONLY on the Tailscale / private interface, never
+# on the public IP, but it still gets a hostname for TLS via DNS challenge
+# or a Tailscale cert.
+admin_host = "admin.example.com"
+acme_email = "you@example.com"
+
+# ---------------------------------------------------------------- vultr
+[vultr]
+api_key = "REPLACE"
+region = "ewr"
+# SSH key IDs already uploaded to Vultr (see `vultr-cli ssh-key list`).
+ssh_key_ids = ["REPLACE"]
+# Ubuntu 24.04 LTS x64. Verify with `vultr-cli os list`.
+os_id = 2284
+# Plan IDs. Verify with `vultr-cli plans list`.
+#   vc2-2c-4gb      Regular, 2 vCPU / 4 GB            ~$20/mo
+#   vhp-4c-8gb-amd  High Performance AMD, 4 vCPU/8 GB  ~$48/mo
+[vultr.plans]
+crawler = "vc2-2c-4gb"
+data = "vhp-4c-8gb-amd"
+web = "vc2-2c-4gb"
+[vultr.counts]
+crawler = 1
+
+# ---------------------------------------------------------------- postgres
+[postgres]
+# Reached over Tailscale MagicDNS; the data VM's hostname is "data".
+# Postgres is published only on the data VM's Tailscale IP.
+host = "data"
+db = "washburn"
+user = "washburn"
+password = "REPLACE-long-random"
+port = 5432
+
+# ---------------------------------------------------------------- backups
+[hetzner]
+# Storage Box SSH endpoint, e.g. u123456.your-storagebox.de (port 23).
+storage_box_host = "uXXXXXX.your-storagebox.de"
+storage_box_user = "uXXXXXX"
+storage_box_port = 23
+# Path on the box; created on first run.
+repo_path = "./backups/washburn"
+borg_passphrase = "REPLACE-long-random"
+# Daily at 03:17 UTC (systemd OnCalendar syntax).
+schedule = "*-*-* 03:17:00 UTC"
+keep_daily = 7
+keep_weekly = 4
+keep_monthly = 6
+
+# ---------------------------------------------------------------- images
+[images]
+# Container registry prefix the VMs pull from; images are
+# <registry>/washburn-{sweeper,judge,web}:<tag>. OWNER is your GHCR user/org.
+registry = "ghcr.io/OWNER"
+tag = "latest"
+# Optional read-only pull token. If both are set, deploy.sh runs `docker login`
+# on each VM with the token on stdin.
+ghcr_user = ""
+ghcr_token = ""
+
+# ---------------------------------------------------------------- tailscale
+[tailscale]
+# Pre-auth key used by cloud-init on every VM. Make it reusable + ephemeral.
+auth_key = "REPLACE"
+# Your tailnet's MagicDNS suffix, e.g. "tail1234.ts.net". VM hostnames are
+# "crawler-1", "data", "web"; all intra-service traffic uses these names.
+tailnet = "REPLACE.ts.net"
+
+# ---------------------------------------------------------------- crawl
+# Defaults for the sweeper daemon. Mirror the crawler CLI flags.
+[crawl]
+user_agent = "washburn/0.1 (+https://example.com/about)"
+# Number of sweeper containers on the crawler VM (Compose replicas).
+workers = 2
+# In-process page concurrency inside ONE sweeper.
+concurrency = 1
+classifier_concurrency = 4
+delay_ms = 1000
+timeout_secs = 20
+retries = 2
+max_body_bytes = 2000000
+chunk_chars = 12000
+max_redirects = 5
+max_depth = 2
+# Jev importance probability at or above which a chunk becomes a level-one
+# finding and is sent to the strong judge. Lower = more judge calls, higher recall.
+importance_threshold = 0.50
+report_threshold = 0.80
+ignore_robots = false
+# Seconds a worker holds a host lease before it must renew or release it.
+host_lease_secs = 120
+heartbeat_secs = 30
+
+# ---------------------------------------------------------------- judge
+[judge]
+# Inside its container the judge binds all interfaces; Compose does not
+# publish the port, so it is reachable only from the sweeper containers.
+bind = "0.0.0.0:8081"
+# What the sweepers dial (Compose service name).
+url = "http://judge:8081"
+concurrency = 2
+timeout_secs = 120
+
+# ---------------------------------------------------------------- web
+[web]
+# Admin uses HTTP basic auth on top of being private-network only.
+admin_user = "admin"
+admin_password = "REPLACE-long-random"
+# Both apps bind all interfaces inside their containers. Caddy fronts the
+# public app; the admin port is published by Compose on the web VM's
+# Tailscale IP only (see deploy/compose/web.yml).
+public_bind = "0.0.0.0:8000"
+admin_bind = "0.0.0.0:8001"

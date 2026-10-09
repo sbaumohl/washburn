@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ report.title }}{% endblock %}
+{% block content %}
+<p><a href="/reports">Back to reports</a></p>
+<h1>{{ report.title }}</h1>
+<dl class="kv">
+  <dt>Source</dt><dd>{{ report.final_url }}</dd>
+  <dt>Fetched</dt><dd>{{ report.fetched_at.strftime("%Y-%m-%d %H:%M UTC") }}</dd>
+  <dt>Published</dt><dd>{{ report.published_at.strftime("%Y-%m-%d") }}</dd>
+</dl>
+<div class="card markdown">{{ body_html | safe }}</div>
+{% endblock %}

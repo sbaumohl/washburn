@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Pages{% endblock %}
+{% block content %}
+<h1>Pages</h1>
+<form class="filters" method="get" action="/pages">
+  <label>Search page text
+    <input type="search" name="q" value="{{ q }}" maxlength="500" size="50">
+  </label>
+  <button type="submit">Search</button>
+</form>
+{% if q %}
+<h2>{{ results|length }} result{% if results|length != 1 %}s{% endif %} for “{{ q }}”</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>URL</th><th>Snippet</th><th>Fetched</th></tr></thead>
+  <tbody>
+  {% for r in results %}
+    <tr>
+      <td><a href="/pages/{{ r.id }}">{{ r.id }}</a></td>
+      <td class="wrap"><a href="/pages/{{ r.id }}">{{ r.final_url }}</a></td>
+      <td class="wrap">{{ r.snippet_html }}</td>
+      <td>{{ r.fetched_at.strftime("%Y-%m-%d %H:%M") }}</td>
+    </tr>
+  {% else %}<tr><td colspan="4" class="muted">No matches.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endif %}
+{% endblock %}

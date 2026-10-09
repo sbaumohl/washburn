@@ -1,0 +1,82 @@
+# Web VM: Caddy (public TLS) + the public and admin FastAPI apps from one image.
+# Env contract: web.env.example.
+#
+# Caddy serves the PUBLIC site only. The admin app is plain HTTP on the Tailscale
+# IP (see the comment in caddy/Caddyfile.example): Tailscale encrypts the path,
+# so it has no TLS and no public DNS record.
+#
+# Both app containers reach Postgres as host `data`, pinned via extra_hosts to
+# WASHBURN_DATA_IP (see crawler.yml for the reasoning).
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    mem_limit: 256m
+    ports:
+      - "0.0.0.0:80:80"
+      - "0.0.0.0:443:443"
+      - "0.0.0.0:443:443/udp"        # HTTP/3
+    environment:
+      WASHBURN_PUBLIC_HOST: ${WASHBURN_PUBLIC_HOST:?set WASHBURN_PUBLIC_HOST in web.env}
+      WASHBURN_ACME_EMAIL: ${WASHBURN_ACME_EMAIL:?set WASHBURN_ACME_EMAIL in web.env}
+    volumes:
+      # Path is relative to this file: /opt/washburn/caddy/Caddyfile on the VM.
+      - ../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - public
+    logging: *logging
+
+  public:
+    image: ${WASHBURN_IMAGE_WEB:?set WASHBURN_IMAGE_WEB in web.env}
+    restart: unless-stopped
+    mem_limit: 512m
+    environment:
+      WASHBURN_APP: public
+      WASHBURN_CONFIG: /etc/washburn/washburn.toml
+    expose:
+      - "8000"                       # reached by Caddy over the compose network; not published
+    volumes:
+      - /etc/washburn/washburn.toml:/etc/washburn/washburn.toml:ro
+    # extra_hosts is the one we rely on: "data" is pinned to the data VM's Tailscale IP.
+    extra_hosts:
+      - "data:${WASHBURN_DATA_IP:?set WASHBURN_DATA_IP in web.env (deploy.sh does this)}"
+    # Secondary path only: Tailscale resolver with the tailnet as search domain.
+    dns:
+      - 100.100.100.100
+    dns_search:
+      - ${WASHBURN_TAILNET:?set WASHBURN_TAILNET in web.env}
+    logging: *logging
+
+  admin:
+    image: ${WASHBURN_IMAGE_WEB:?set WASHBURN_IMAGE_WEB in web.env}
+    restart: unless-stopped
+    mem_limit: 512m
+    environment:
+      WASHBURN_APP: admin
+      WASHBURN_CONFIG: /etc/washburn/washburn.toml
+    ports:
+      - "${WASHBURN_TAILSCALE_IP:?set WASHBURN_TAILSCALE_IP (deploy.sh does this)}:8001:8001"
+    volumes:
+      - /etc/washburn/washburn.toml:/etc/washburn/washburn.toml:ro
+    # extra_hosts is the one we rely on: "data" is pinned to the data VM's Tailscale IP.
+    extra_hosts:
+      - "data:${WASHBURN_DATA_IP:?set WASHBURN_DATA_IP in web.env (deploy.sh does this)}"
+    # Secondary path only: Tailscale resolver with the tailnet as search domain.
+    dns:
+      - 100.100.100.100
+    dns_search:
+      - ${WASHBURN_TAILNET:?set WASHBURN_TAILNET in web.env}
+    logging: *logging
+
+volumes:
+  caddy_data:
+  caddy_config:

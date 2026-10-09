@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block content %}
+<h1>Published reports</h1>
+{% if reports %}
+<div class="table-wrap"><table>
+  <thead><tr><th>Report</th><th>Source</th><th>Fetched</th><th>Published</th></tr></thead>
+  <tbody>
+  {% for r in reports %}
+    <tr>
+      <td class="wrap"><a href="/reports/{{ r.id }}">{{ r.title }}</a></td>
+      <td class="wrap muted">{{ r.final_url }}</td>
+      <td>{{ r.fetched_at.strftime("%Y-%m-%d") }}</td>
+      <td>{{ r.published_at.strftime("%Y-%m-%d") }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% else %}<p class="muted">No reports have been published yet.</p>{% endif %}
+<div class="pager">
+  {% if has_prev %}<a href="/reports?page={{ page - 1 }}">Newer</a>{% endif %}
+  {% if has_next %}<a href="/reports?page={{ page + 1 }}">Older</a>{% endif %}
+</div>
+{% endblock %}

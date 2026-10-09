@@ -1,0 +1,37 @@
+# Build context for docker/Dockerfile.rust (repository root).
+# Keep: Cargo.toml, Cargo.lock, crates/, db/ (db/migrations is embedded by
+# sqlx::migrate! at compile time), washburn.example.toml (include_str! in tests).
+
+# Build output and VCS
+**/target
+.git/
+
+# Secrets and rendered per-VM config
+washburn.toml
+*.local.toml
+.rendered/
+**/*.env
+
+# Local data and runs
+runs/
+data/
+**/*.csv
+**/*.parquet
+**/*.pq
+
+# Non-Rust trees and docs (not needed by the Rust build)
+web/
+docs/
+infra/
+deploy/
+rubric/
+scripts/
+
+# Python and tool caches
+**/.venv/
+**/__pycache__/
+.pytest_cache/
+.ruff_cache/
+
+# Markdown is never read by the Rust build
+**/*.md

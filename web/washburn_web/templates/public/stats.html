@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Stats{% endblock %}
+{% block content %}
+<h1>Washburn</h1>
+<p class="muted">Automated review of publicly reachable web pages, with every published
+finding checked by a person before it appears here. <a href="/about">About this site</a>.</p>
+<div class="grid">
+  <div class="card stat"><div class="value">{{ stats.totals.pages or 0 }}</div><div class="label">pages crawled</div></div>
+  <div class="card stat"><div class="value">{{ stats.totals.hosts or 0 }}</div><div class="label">hosts</div></div>
+  <div class="card stat"><div class="value">{{ stats.totals.published_findings or 0 }}</div><div class="label">published findings</div></div>
+  <div class="card stat"><div class="value">{{ stats.totals.last_published_at.strftime("%Y-%m-%d") if stats.totals.last_published_at else "none" }}</div><div class="label">last published</div></div>
+</div>
+<h2>Published findings by kind</h2>
+{% if stats.by_kind %}
+<div class="table-wrap"><table>
+  <thead><tr><th>Kind</th><th class="num">Published</th></tr></thead>
+  <tbody>{% for row in stats.by_kind %}<tr><td>{{ row.kind }}</td><td class="num">{{ row.n }}</td></tr>{% endfor %}</tbody>
+</table></div>
+{% else %}<p class="muted">Nothing published yet.</p>{% endif %}
+<p><a href="/reports">Read the published reports</a></p>
+{% endblock %}

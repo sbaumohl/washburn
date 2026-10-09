@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Page {{ page.id }}{% endblock %}
+{% block content %}
+<p><a href="/pages">Back to search</a></p>
+<h1>Page {{ page.id }}</h1>
+<div class="card">
+  <dl class="kv">
+    <dt>URL</dt><dd>{{ page.url }}</dd>
+    <dt>Final URL</dt><dd>{{ page.final_url }}</dd>
+    <dt>HTTP status</dt><dd>{{ page.status }}</dd>
+    <dt>Content type</dt><dd>{{ page.content_type or "-" }}</dd>
+    <dt>Fetched</dt><dd>{{ page.fetched_at.strftime("%Y-%m-%d %H:%M:%S") }}</dd>
+    <dt>Worker</dt><dd>{{ page.worker }}</dd>
+    <dt>Links found</dt><dd>{{ page.links_count }}</dd>
+    <dt>Body (sha256)</dt><dd><code>{{ page.body_sha256.hex() }}</code></dd>
+    <dt>Body download</dt><dd><a href="/pages/{{ page.id }}/body">download raw body (zstd-decoded, octet-stream)</a></dd>
+  </dl>
+</div>
+<h2>Redirects</h2>
+{% if page.redirects %}
+<pre>{{ page.redirects | tojson(indent=2) }}</pre>
+{% else %}<p class="muted">No redirects.</p>{% endif %}
+<h2>Extracted text</h2>
+<p class="muted">{{ page.text_len }} characters total{% if page.text_len > page.text_head|length %}; showing the first {{ page.text_head|length }}{% endif %}.</p>
+<pre>{{ page.text_head }}</pre>
+{% endblock %}

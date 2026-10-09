@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Threshold{% endblock %}
+{% block content %}
+<h1>Importance threshold</h1>
+<p class="muted">Every Jev screening, bucketed by importance in 0.05-wide bins. Routing threshold in
+config: <strong>{{ "%.2f" | format(routing_threshold) }}</strong>. Judged counts screenings that
+went to the strong judge; judgments exist only for screenings at or above the threshold in force
+when they were made, so bins below it show zero judged. Confirmed counts judgments with
+<code>confirmed_serious</code>.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Importance bin</th><th class="num">Screenings</th><th class="num">Judged</th><th class="num">Confirmed serious</th><th class="num">Confirm rate</th><th style="width:30%"></th></tr></thead>
+  <tbody>
+  {% for b in bins %}
+    <tr>
+      <td>{{ b.label }}{% if b.low >= routing_threshold - 0.0001 %} <span class="chip">routed</span>{% endif %}</td>
+      <td class="num">{{ b.screenings }}</td>
+      <td class="num">{{ b.judged }}</td>
+      <td class="num">{{ b.confirmed }}</td>
+      <td class="num">{% if b.judged %}{{ "%.0f" | format(b.confirmed * 100 / b.judged) }}%{% else %}-{% endif %}</td>
+      <td><span class="bar" style="width: {{ (b.screenings * 100 / max_count) | round(1) if max_count else 0 }}%"></span></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}

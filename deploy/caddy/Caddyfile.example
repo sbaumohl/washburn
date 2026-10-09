@@ -1,0 +1,32 @@
+# Caddyfile for the web VM, mounted read-only at /etc/caddy/Caddyfile.
+# Rendered to .rendered/deploy/caddy/Caddyfile. Every host and email comes from
+# env (WASHBURN_PUBLIC_HOST, WASHBURN_ACME_EMAIL, set in web.env), so the
+# rendered file is a verbatim copy of this one.
+#
+# Only the PUBLIC site is served here. The admin dashboard is NOT behind Caddy:
+# the admin container listens on plain HTTP at <tailscale-ip>:8001, published
+# by Compose on the Tailscale interface only. Tailscale encrypts that path
+# (WireGuard), so it needs no TLS and no public DNS record. [domain].admin_host
+# is therefore unused by Caddy.
+
+{
+	email {$WASHBURN_ACME_EMAIL}
+}
+
+{$WASHBURN_PUBLIC_HOST} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		# Conservative CSP. The public site has no inline script or style.
+		# If htmx is used from a CDN, add its exact host to script-src (here: unpkg.com).
+		# Vendoring htmx under /static removes the need for any external host.
+		Content-Security-Policy "default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		-Server
+	}
+
+	reverse_proxy public:8000
+}

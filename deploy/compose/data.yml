@@ -1,0 +1,54 @@
+# Data VM: Postgres 16, the system of record. Env contract: data.env.example.
+#
+# Published ONLY on the Tailscale IP. The `:?` form makes Compose refuse to
+# start if WASHBURN_TAILSCALE_IP is empty; without it the port would bind on
+# every interface. deploy.sh writes WASHBURN_TAILSCALE_IP into data.env.
+#
+# Backups are NOT a container here. deploy/backup/backup.sh runs on the host
+# under systemd and uses `docker exec washburn-postgres pg_dump`.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: washburn-postgres   # backup.sh and restore-drill.sh rely on this name
+    restart: unless-stopped
+    mem_limit: 6g
+    shm_size: 512m
+    stop_grace_period: 2m               # let postgres shut down cleanly on SIGTERM
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in data.env}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in data.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in data.env}
+    command:
+      - postgres
+      - -c
+      - shared_buffers=2GB
+      - -c
+      - effective_cache_size=5GB
+      - -c
+      - maintenance_work_mem=256MB
+      - -c
+      - work_mem=16MB
+      - -c
+      - wal_compression=zstd
+      - -c
+      - max_connections=60
+      - -c
+      - log_min_duration_statement=2000
+    ports:
+      - "${WASHBURN_TAILSCALE_IP:?set WASHBURN_TAILSCALE_IP (deploy.sh does this)}:5432:5432"
+    volumes:
+      - /opt/washburn/pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging: *logging

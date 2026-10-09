@@ -1,0 +1,15 @@
+# OnCalendar is a placeholder. systemd units cannot read env files, so
+# scripts/deploy.sh replaces this line with [hetzner].schedule (rendered as
+# WASHBURN_BACKUP_SCHEDULE in data.env) when it installs the timer.
+# Check the result with: systemctl cat washburn-backup.timer
+#                        systemctl list-timers washburn-backup.timer
+[Unit]
+Description=Nightly Washburn Postgres backup
+
+[Timer]
+OnCalendar=*-*-* 03:17:00 UTC
+Persistent=true
+RandomizedDelaySec=10m
+
+[Install]
+WantedBy=timers.target

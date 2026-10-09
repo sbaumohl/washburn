@@ -1,0 +1,68 @@
+# Crawler VM: N sweeper replicas plus the judge. Env contract: crawler.env.example.
+#
+# Replicas: `scale:` below reads WASHBURN_WORKERS from the env file, so the
+# count survives `systemctl start washburn-compose@crawler` (which runs a plain
+# `up -d`). deploy.sh also passes `--scale sweeper=N` explicitly.
+#
+# Networking: default bridge network. Postgres lives on the data VM and is
+# reached by the host name `data`, which extra_hosts maps to the data VM's
+# Tailscale IP (WASHBURN_DATA_IP). That mapping is what the sweeper relies on.
+# dns/dns_search (Tailscale MagicDNS) are kept as a secondary path only.
+# Docker's embedded resolver still answers `judge` (Compose service name).
+#
+# The judge publishes NO ports. Only containers on this compose network can
+# reach http://judge:8081.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+services:
+  sweeper:
+    image: ${WASHBURN_IMAGE_SWEEPER:?set WASHBURN_IMAGE_SWEEPER in crawler.env}
+    scale: ${WASHBURN_WORKERS:?set WASHBURN_WORKERS in crawler.env}
+    restart: unless-stopped
+    mem_limit: 1200m
+    stop_grace_period: 60s   # SIGTERM: finish in-flight jobs, release host lease
+    environment:
+      WASHBURN_CONFIG: /etc/washburn/washburn.toml
+    volumes:
+      - /etc/washburn/washburn.toml:/etc/washburn/washburn.toml:ro
+      - /etc/washburn/rubric.md:/etc/washburn/rubric.md:ro
+    # extra_hosts is the one we rely on: "data" is pinned to the data VM's Tailscale IP
+    # (deploy.sh writes WASHBURN_DATA_IP from `tailscale ip -4 data`), so no DNS is involved.
+    extra_hosts:
+      - "data:${WASHBURN_DATA_IP:?set WASHBURN_DATA_IP in crawler.env (deploy.sh does this)}"
+    # Secondary path only: the Tailscale resolver, with the tailnet as search domain.
+    dns:
+      - 100.100.100.100
+    dns_search:
+      - ${WASHBURN_TAILNET:?set WASHBURN_TAILNET in crawler.env}
+    depends_on:
+      judge:
+        condition: service_healthy
+    logging: *logging
+
+  judge:
+    image: ${WASHBURN_IMAGE_JUDGE:?set WASHBURN_IMAGE_JUDGE in crawler.env}
+    restart: unless-stopped
+    mem_limit: 256m
+    stop_grace_period: 30s
+    environment:
+      WASHBURN_CONFIG: /etc/washburn/washburn.toml
+    volumes:
+      - /etc/washburn/washburn.toml:/etc/washburn/washburn.toml:ro
+      - /etc/washburn/rubric.md:/etc/washburn/rubric.md:ro
+    # Requires wget in the judge image (W8). Binds 0.0.0.0 inside the container,
+    # so 127.0.0.1 reaches it from within.
+    extra_hosts:   # harmless here; keeps every service's env contract identical
+      - "data:${WASHBURN_DATA_IP:?set WASHBURN_DATA_IP in crawler.env (deploy.sh does this)}"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8081/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging: *logging

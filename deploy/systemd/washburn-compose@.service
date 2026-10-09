@@ -1,0 +1,28 @@
+# Brings a Washburn compose stack up at boot and down at shutdown.
+# Instance name = role: washburn-compose@crawler, @data, @web.
+# Files: /opt/washburn/compose/<role>.yml and <role>.env (installed by deploy.sh).
+[Unit]
+Description=Washburn compose stack (%i)
+Documentation=file:///opt/washburn/compose
+After=docker.service tailscaled.service network-online.target
+Wants=network-online.target tailscaled.service
+Requires=docker.service
+ConditionPathExists=/opt/washburn/compose/%i.yml
+ConditionPathExists=/opt/washburn/compose/%i.env
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/washburn/compose
+# The data stack publishes Postgres on the Tailscale IP. Docker cannot bind an
+# address that does not exist yet, so wait (up to 2 min) for tailscaled to have one.
+ExecStartPre=/usr/bin/timeout 120 /bin/sh -c 'until /usr/bin/tailscale ip -4 >/dev/null 2>&1; do sleep 2; done'
+ExecStart=/usr/bin/docker compose -f /opt/washburn/compose/%i.yml --env-file /opt/washburn/compose/%i.env up -d
+ExecStop=/usr/bin/docker compose -f /opt/washburn/compose/%i.yml --env-file /opt/washburn/compose/%i.env down
+TimeoutStartSec=900
+TimeoutStopSec=300
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

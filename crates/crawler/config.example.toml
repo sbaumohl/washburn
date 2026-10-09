@@ -1,0 +1,12 @@
+# Copy to config.toml (gitignored), insert your credentials and review model.
+# This file is loaded only when explicitly selected using --config.
+[typesafe]
+api_key = "REPLACE_WITH_TYPESAFE_KEY"
+model = "jev-latest"
+base_url = "https://api.typesafe.ai/v1"
+
+[openrouter]
+api_key = "REPLACE_WITH_OPENROUTER_KEY"
+# Choose a strong model whose provider supports JSON-schema structured outputs.
+model = "provider/strong-review-model"
+base_url = "https://openrouter.ai/api/v1"

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}About{% endblock %}
+{% block content %}
+<h1>About</h1>
+<p>Washburn is an automated research project. It crawls publicly reachable web pages on a
+set of operator-chosen sites, screens the text of each page with a classifier, and sends
+passages that score as potentially serious to a second, stronger model for review.</p>
+<p>Automated output is not a conclusion. Every report on this site has been read and
+approved by a person before publication. Reports describe what a page says and what the
+reviewers could and could not establish; they are not legal findings, and a page's
+operator may have context that is not visible from the page itself.</p>
+<p>If you believe a report is wrong or about a site you run, contact the operator at the
+address listed on the domain.</p>
+<p class="muted">This site shows only published reports and aggregate counts. Unreviewed
+material is never shown here.</p>
+{% endblock %}

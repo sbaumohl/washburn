@@ -1,0 +1,23 @@
+[package]
+name = "cn-swarms"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4.5", features = ["derive", "env"] }
+csv = "1.3"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "gzip", "brotli", "charset", "stream"] }
+robotstxt = "0.3"
+scraper = "0.27"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time", "signal", "net"] }
+toml = "0.9"
+url = { version = "2", features = ["serde"] }
+
+[dev-dependencies]
+axum = "0.8"
+tempfile = "3"

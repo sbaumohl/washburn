@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+<p class="muted">Signed in as {{ user }}. Rates cover the last 24 hours.</p>
+
+<div class="grid">
+  <div class="card stat"><div class="value">{{ workers|length }}</div><div class="label">live workers</div></div>
+  <div class="card stat"><div class="value">{{ queue|sum(attribute="pending") }}</div><div class="label">pending URLs</div></div>
+  <div class="card stat"><div class="value">{{ rates.screenings or 0 }}</div><div class="label">screenings (24h)</div></div>
+  <div class="card stat"><div class="value">{% if flag_rate is none %}n/a{% else %}{{ "%.1f" | format(flag_rate * 100) }}%{% endif %}</div><div class="label">Jev flag rate</div></div>
+  <div class="card stat"><div class="value">{% if confirm_rate is none %}n/a{% else %}{{ "%.1f" | format(confirm_rate * 100) }}%{% endif %}</div><div class="label">judge confirm rate ({{ rates.judgments or 0 }} judged)</div></div>
+  <div class="card stat"><div class="value">{% if downgrade_rate is none %}n/a{% else %}{{ "%.1f" | format(downgrade_rate * 100) }}%{% endif %}</div><div class="label">judge downgrade rate</div></div>
+</div>
+
+<div class="card">
+  <p>Public site:
+    {% if public_site and public_site.value %}<span class="ok"><strong>ON</strong></span>{% elif public_site %}<span class="warn"><strong>OFF</strong></span>{% else %}<span class="warn"><strong>OFF (setting missing; failing closed)</strong></span>{% endif %}
+    {% if public_site %}<span class="muted">last changed {{ public_site.updated_at.strftime("%Y-%m-%d %H:%M:%S") }} by {{ public_site.updated_by or "-" }}</span>{% endif %}
+  </p>
+  <form method="post" action="/settings/public-site" class="inline">
+    {% if public_site and public_site.value %}
+    <input type="hidden" name="enabled" value="false">
+    <button type="submit" class="danger">Turn public site OFF</button>
+    {% else %}
+    <input type="hidden" name="enabled" value="true">
+    <button type="submit" class="primary">Turn public site ON</button>
+    {% endif %}
+  </form>
+</div>
+
+<h2>Live workers</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Worker</th><th>Version</th><th>Host lease</th><th class="num">Active jobs</th><th>Last seen</th><th>Started</th></tr></thead>
+  <tbody>
+  {% for w in workers %}
+    <tr><td class="wrap">{{ w.worker }}</td><td>{{ w.version }}</td><td>{{ w.leased_host or "-" }}</td>
+        <td class="num">{{ w.active_jobs }}</td><td>{{ w.last_seen.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+        <td>{{ w.started_at.strftime("%Y-%m-%d %H:%M:%S") }}</td></tr>
+  {% else %}<tr><td colspan="6" class="muted">No live workers (none seen in the last 90 seconds).</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+
+<h2>Queue depth by host</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Host</th><th class="num">Pending</th></tr></thead>
+  <tbody>
+  {% for q in queue %}<tr><td class="wrap">{{ q.host }}</td><td class="num">{{ q.pending }}</td></tr>
+  {% else %}<tr><td colspan="2" class="muted">Queue is empty.</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+
+<h2>Pages per hour (last 24h)</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Hour (UTC)</th><th>Pages</th><th></th></tr></thead>
+  <tbody>
+  {% set peak = pages_per_hour|map(attribute="pages")|max if pages_per_hour else 1 %}
+  {% for h in pages_per_hour %}
+    <tr><td>{{ h.hour.strftime("%Y-%m-%d %H:00") }}</td><td class="num">{{ h.pages }}</td>
+        <td style="width:50%"><span class="bar" style="width: {{ (h.pages * 100 / peak) | round(1) }}%"></span></td></tr>
+  {% else %}<tr><td colspan="3" class="muted">No pages fetched in the last 24 hours.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+
+<h2>Last 50 events</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>At (UTC)</th><th>Kind</th><th>Worker</th><th>Detail</th></tr></thead>
+  <tbody>
+  {% for e in events %}
+    <tr><td>{{ e.at.strftime("%Y-%m-%d %H:%M:%S") }}</td><td>{{ e.kind }}</td><td class="wrap">{{ e.worker }}</td>
+        <td class="wrap"><code>{{ e.detail | tojson }}</code></td></tr>
+  {% else %}<tr><td colspan="4" class="muted">No events yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}

@@ -1,0 +1,16 @@
+# Nightly Postgres dump to the Hetzner Storage Box via borg.
+# Started by washburn-backup.timer. Runs on the data VM only.
+[Unit]
+Description=Washburn Postgres backup (pg_dump -> zstd -> borg)
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+ConditionPathExists=/opt/washburn/backup/borg.env
+
+[Service]
+Type=oneshot
+EnvironmentFile=/opt/washburn/backup/borg.env
+ExecStart=/opt/washburn/backup/backup.sh
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=6h

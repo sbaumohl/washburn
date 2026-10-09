@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Finding {{ finding.id }}{% endblock %}
+{% block content %}
+<p><a href="/findings">Back to findings</a></p>
+<h1>{{ finding.title }} <span class="chip">{{ finding.kind }}</span>
+  {% if finding.published %}<span class="chip ok">published</span>{% else %}<span class="chip">unpublished</span>{% endif %}</h1>
+
+<div class="card">
+  <dl class="kv">
+    <dt>Page</dt><dd><a href="/pages/{{ finding.page_id }}">#{{ finding.page_id }}</a></dd>
+    <dt>URL</dt><dd>{{ finding.url }}</dd>
+    <dt>Final URL</dt><dd>{{ finding.final_url }}</dd>
+    <dt>HTTP status</dt><dd>{{ finding.status }}</dd>
+    <dt>Fetched</dt><dd>{{ finding.fetched_at.strftime("%Y-%m-%d %H:%M:%S") }}</dd>
+    <dt>Created / updated</dt><dd>{{ finding.created_at.strftime("%Y-%m-%d %H:%M") }} / {{ finding.updated_at.strftime("%Y-%m-%d %H:%M") }}</dd>
+    <dt>Reviewed</dt><dd>{% if finding.reviewed_by %}{{ finding.reviewed_by }} at {{ finding.reviewed_at.strftime("%Y-%m-%d %H:%M") }}{% else %}not yet{% endif %}</dd>
+    <dt>Review note</dt><dd>{{ finding.review_note or "-" }}</dd>
+    <dt>Published at</dt><dd>{{ finding.published_at.strftime("%Y-%m-%d %H:%M") if finding.published_at else "-" }}</dd>
+  </dl>
+</div>
+
+<div class="card">
+  {% if finding.published %}
+  <form method="post" action="/findings/{{ finding.id }}/unpublish">
+    <label>Review note<br><textarea name="review_note" maxlength="4000"></textarea></label>
+    <p><button type="submit">Unpublish</button></p>
+  </form>
+  {% else %}
+  <form method="post" action="/findings/{{ finding.id }}/publish">
+    {% if not public_site_on %}<p class="warn">The public site is off; this report will not be visible until it is turned on.</p>{% endif %}
+    <label>Review note<br><textarea name="review_note" maxlength="4000"></textarea></label>
+    <p><button type="submit" class="primary">Publish</button>
+      {% if finding.kind != "report" %}<span class="muted">Only report-kind findings appear on the public site.</span>{% endif %}</p>
+  </form>
+  {% endif %}
+</div>
+
+<h2>Markdown</h2>
+<div class="card markdown">{{ body_html | safe }}</div>
+
+<h2>Screenings for this page</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Chunk</th><th class="num">Importance</th><th class="num">Agent activity</th><th class="num">Potentially serious</th><th>Level one</th><th class="num">Threshold</th><th>Model</th></tr></thead>
+  <tbody>
+  {% for s in screenings %}
+    <tr><td>{{ s.chunk }}</td><td class="num">{{ "%.3f" | format(s.importance) }}</td><td class="num">{{ "%.3f" | format(s.agent_activity) }}</td>
+        <td class="num">{{ "%.3f" | format(s.potentially_serious) }}</td><td>{{ "yes" if s.level_one else "no" }}</td>
+        <td class="num">{{ "%.2f" | format(s.threshold) }}</td><td class="wrap">{{ s.model }}</td></tr>
+  {% else %}<tr><td colspan="7" class="muted">No screenings recorded.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+
+<h2>Judgments for this page</h2>
+{% for j in judgments %}
+<div class="card">
+  <p><strong>Chunk {{ j.chunk }}</strong> <span class="chip">{{ j.classification }}</span>
+    {% if j.confirmed_serious %}<span class="chip warn">confirmed serious</span>{% endif %}
+    <span class="muted">{{ j.model }}</span></p>
+  <dl class="kv">
+    <dt>Activity</dt><dd>{{ "%.3f" | format(j.activity) }}</dd>
+    <dt>Seriousness</dt><dd>{{ "%.3f" | format(j.seriousness) }}</dd>
+    <dt>Confidence</dt><dd>{{ "%.3f" | format(j.confidence) }}</dd>
+  </dl>
+  <p>{{ j.summary }}</p>
+  {% if j.evidence %}
+  <h3>Evidence</h3>
+  <ul>{% for q in j.evidence %}<li><blockquote class="wrap">{{ q if q is string else (q | tojson) }}</blockquote></li>{% endfor %}</ul>
+  {% endif %}
+  {% if j.uncertainties %}
+  <h3>Uncertainties</h3>
+  <ul>{% for u in j.uncertainties %}<li class="wrap">{{ u if u is string else (u | tojson) }}</li>{% endfor %}</ul>
+  {% endif %}
+</div>
+{% else %}<p class="muted">No judgments for this page.</p>
+{% endfor %}
+{% endblock %}

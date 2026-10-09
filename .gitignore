@@ -1,0 +1,31 @@
+# secrets: the single config file and everything rendered from it
+/washburn.toml
+*.local.toml
+/.rendered/
+infra/*.tfvars
+infra/*.tfvars.json
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.backup
+deploy/**/.env
+deploy/**/*.env
+
+# build output
+/target
+web/.venv/
+web/__pycache__/
+**/__pycache__/
+*.pyc
+
+# local crawl output and data
+/runs/
+/data/
+*.parquet
+*.pq
+*.csv
+!examples/*.csv
+
+# editors
+.idea/
+.vscode/
+*.swp

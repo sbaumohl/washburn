@@ -1,0 +1,72 @@
+# Washburn Rust images: washburn-judge and washburn-sweeper.
+#
+# One builder stage compiles the whole Cargo workspace once; two final stages
+# (`judge`, `sweeper`) each copy in only their own binary.
+#
+#   docker buildx build -f docker/Dockerfile.rust --target judge   -t washburn-judge   .
+#   docker buildx build -f docker/Dockerfile.rust --target sweeper -t washburn-sweeper .
+#
+# Build context is the repository root; .dockerignore decides what is sent.
+# Requires BuildKit (default in `docker buildx`) for `RUN --mount=type=cache`.
+
+ARG RUST_IMAGE=rust:1-slim-bookworm
+ARG RUNTIME_IMAGE=debian:bookworm-slim
+ARG SOURCE_URL=https://github.com/OWNER/washburn
+
+# ---------------------------------------------------------------------------
+# Build stage. Dependency caching uses BuildKit cache mounts instead of stub
+# sources: the registry and target dir persist across builds on this builder,
+# and nothing has to mirror the crate layout. The release binaries are copied
+# to /out inside the same RUN, because cache-mounted paths do not exist in the
+# image layer.
+# ---------------------------------------------------------------------------
+FROM ${RUST_IMAGE} AS builder
+WORKDIR /build
+
+COPY . .
+
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/build/target,sharing=locked \
+    cargo build --release --workspace --locked \
+ && mkdir -p /out \
+ && strip target/release/washburn-judge target/release/washburn-sweeper \
+ && cp target/release/washburn-judge target/release/washburn-sweeper /out/
+
+# ---------------------------------------------------------------------------
+# Shared runtime base: no compiler, no shell tools beyond what slim provides,
+# fixed non-root identity (D15).
+# ---------------------------------------------------------------------------
+FROM ${RUNTIME_IMAGE} AS runtime
+ARG SOURCE_URL
+
+# wget is required by the compose healthcheck (judge: wget http://127.0.0.1:8081/healthz).
+# hadolint ignore=DL3008
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates tzdata wget \
+ && rm -rf /var/lib/apt/lists/* \
+ && groupadd --system --gid 10001 washburn \
+ && useradd --system --uid 10001 --gid washburn --no-create-home \
+        --home-dir /nonexistent --shell /usr/sbin/nologin washburn \
+ && mkdir -p /etc/washburn
+
+ENV WASHBURN_CONFIG=/etc/washburn/washburn.toml \
+    WASHBURN_LOG_JSON=1
+
+LABEL org.opencontainers.image.source="${SOURCE_URL}" \
+      org.opencontainers.image.licenses="MIT"
+
+USER 10001:10001
+
+# ---------------------------------------------------------------------------
+# Final targets.
+# ---------------------------------------------------------------------------
+FROM runtime AS judge
+LABEL org.opencontainers.image.description="Washburn judge: HTTP wrapper around the LLM review model (washburn-judge)"
+COPY --from=builder /out/washburn-judge /usr/local/bin/washburn-judge
+EXPOSE 8081
+ENTRYPOINT ["/usr/local/bin/washburn-judge"]
+
+FROM runtime AS sweeper
+LABEL org.opencontainers.image.description="Washburn sweeper: crawl worker daemon (washburn-sweeper)"
+COPY --from=builder /out/washburn-sweeper /usr/local/bin/washburn-sweeper
+ENTRYPOINT ["/usr/local/bin/washburn-sweeper"]

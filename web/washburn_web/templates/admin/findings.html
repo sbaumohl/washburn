@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Findings{% endblock %}
+{% block content %}
+<h1>Findings</h1>
+<form class="filters" method="get" action="/findings">
+  <label>Kind
+    <select name="kind">
+      <option value="">any</option>
+      {% for k in kinds %}<option value="{{ k }}" {% if kind == k %}selected{% endif %}>{{ k }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Published
+    <select name="published">
+      <option value="" {% if published == "" %}selected{% endif %}>any</option>
+      <option value="true" {% if published == "true" %}selected{% endif %}>yes</option>
+      <option value="false" {% if published == "false" %}selected{% endif %}>no</option>
+    </select>
+  </label>
+  <button type="submit">Filter</button>
+</form>
+<div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>Kind</th><th>Title</th><th>Page</th><th>Published</th><th>Reviewed by</th><th>Created</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td><a href="/findings/{{ r.id }}">{{ r.id }}</a></td>
+      <td>{{ r.kind }}</td>
+      <td class="wrap"><a href="/findings/{{ r.id }}">{{ r.title }}</a></td>
+      <td class="wrap muted">{{ r.final_url }}</td>
+      <td>{% if r.published %}<span class="ok">yes</span>{% else %}no{% endif %}</td>
+      <td>{{ r.reviewed_by or "-" }}</td>
+      <td>{{ r.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+    </tr>
+  {% else %}<tr><td colspan="7" class="muted">No findings match.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+<div class="pager">
+  {% if has_prev %}<a href="/findings?kind={{ kind }}&amp;published={{ published }}&amp;page={{ page - 1 }}">Newer</a>{% endif %}
+  {% if has_next %}<a href="/findings?kind={{ kind }}&amp;published={{ published }}&amp;page={{ page + 1 }}">Older</a>{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Seeds{% endblock %}
+{% block content %}
+<h1>Seeds</h1>
+<p class="muted">A seed adds its host to the crawl scope and queues the URL at depth 0. Links stay
+within the exact host[:port] of a seed; subdomains need their own seed.</p>
+<form method="post" action="/seeds" class="card">
+  <label>Seed URL<br><input type="url" name="url" required maxlength="2048" placeholder="https://example.com/"></label>
+  <button type="submit" class="primary">Add seed</button>
+  {% if error %}<p class="warn">{{ error }}</p>{% endif %}
+</form>
+<form method="post" action="/seeds/bulk" class="card">
+  <h2>Bulk add</h2>
+  <p class="muted">One target per line: a URL, or a bare domain or IP (gets https://). Fragments are
+  dropped; blank lines and lines starting with # are ignored. At most 5000 lines per request.</p>
+  <label>URLs<br><textarea name="urls" rows="10" class="wide" placeholder="example.com&#10;https://example.org/start"></textarea></label>
+  <label>Note (optional)<br><input type="text" name="note" maxlength="500"></label>
+  <p><button type="submit" class="primary">Add all</button></p>
+</form>
+{% if bulk %}
+<section class="card" id="bulk-summary">
+  <h2>Bulk add result</h2>
+  <p>Added <strong>{{ bulk.added }}</strong>, already present <strong>{{ bulk.already_present }}</strong>,
+    rejected <strong>{{ bulk.rejected_count }}</strong>{% if bulk.duplicates %}, duplicates in paste <strong>{{ bulk.duplicates }}</strong>{% endif %}.</p>
+  {% if bulk.rejected %}
+  <p class="muted">Showing the first {{ bulk.rejected|length }} of {{ bulk.rejected_count }} rejected lines.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Line</th><th>Reason</th></tr></thead>
+    <tbody>{% for r in bulk.rejected %}<tr><td class="wrap"><code>{{ r.line }}</code></td><td class="wrap">{{ r.reason }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% endif %}
+</section>
+{% endif %}
+<p><a href="/seeds/export">Export enabled seed URLs (plain text)</a></p>
+<div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>URL</th><th>Host</th><th class="num">Queued</th><th>Added by</th><th>Added</th><th>State</th><th></th></tr></thead>
+  <tbody>
+  {% for s in seeds %}
+    <tr>
+      <td>{{ s.id }}</td>
+      <td class="wrap">{{ s.url }}</td>
+      <td class="wrap">{{ s.host }}</td>
+      <td class="num">{{ s.queued }}</td>
+      <td>{{ s.added_by or "-" }}</td>
+      <td>{{ s.added_at.strftime("%Y-%m-%d %H:%M") }}</td>
+      <td>{% if s.enabled %}<span class="ok">enabled</span>{% else %}<span class="muted">disabled</span>{% endif %}</td>
+      <td>{% if s.enabled %}
+        <form method="post" action="/seeds/{{ s.id }}/disable" class="inline"><button type="submit">Disable</button></form>
+      {% endif %}</td>
+    </tr>
+  {% else %}<tr><td colspan="8" class="muted">No seeds yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}
