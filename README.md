@@ -2,10 +2,7 @@
 
 An always-on service for crawling web targets, classifying every text chunk
 with TypeSafe Jev, escalating flagged chunks to a strong OpenRouter judge, and
-letting an operator search, review, and publish the resulting findings.
-
-Washburn is the service form of the `cn-swarms` CLI, which lives on unchanged
-as `crates/crawler`. The design, decisions, component contracts, and current
+letting an operator search, review, and publish the resulting findings. Its design, decisions, component contracts, and current
 status are in [PROJECTS.md](PROJECTS.md). The architecture diagram is
 `docs/architecture.excalidraw`.
 
